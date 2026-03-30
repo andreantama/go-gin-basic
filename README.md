@@ -13,6 +13,7 @@ Proyek ini adalah contoh implementasi **Clean Architecture** menggunakan **Go** 
 - [Cara Menjalankan](#cara-menjalankan)
 - [REST API Endpoints](#rest-api-endpoints)
 - [Contoh Request & Response](#contoh-request--response)
+- [Task Scheduler](#-task-scheduler)
 - [Penjelasan Setiap Layer](#penjelasan-setiap-layer)
 
 ---
@@ -67,9 +68,14 @@ go-gin-basic/
 │   │   └── http/
 │   │       └── user_handler.go      # GIN HTTP handlers untuk /users dan /auth
 │   │
-│   └── middleware/                  # ← Middleware HTTP
+│   ├── middleware/                  # ← Middleware HTTP
+│   │   ├── README.md
+│   │   └── auth_middleware.go       # JWT auth, admin-only, CORS middleware
+│   │
+│   └── scheduler/                  # ← Task Scheduler (mirip Laravel)
 │       ├── README.md
-│       └── auth_middleware.go       # JWT auth, admin-only, CORS middleware
+│       ├── scheduler.go             # Engine scheduler: registrasi, start, stop
+│       └── task.go                  # Definisi Task: nama, jadwal, fungsi, metadata
 │
 ├── pkg/                             # Utility packages yang bisa dipakai ulang
 │   ├── README.md
@@ -327,6 +333,73 @@ curl -X DELETE http://localhost:8080/users/1 \
 
 ---
 
+## ⏰ Task Scheduler
+
+Proyek ini dilengkapi dengan fitur **Task Scheduler** yang terinspirasi dari **Laravel Task Scheduler**. Fitur ini memungkinkan Anda mendaftarkan tugas-tugas yang berjalan secara otomatis di background sesuai jadwal.
+
+### Fitur Utama
+
+- 🕐 **API ekspresif** mirip Laravel: `EveryMinute()`, `Hourly()`, `Daily()`, `Weekly()`, dll.
+- 📝 **Cron expression** kustom dengan dukungan format 6-field (detik).
+- 🛡️ **Pencegahan overlap** — tugas yang sama tidak berjalan bersamaan.
+- 🔄 **Recovery dari panic** — satu tugas gagal tidak menghentikan scheduler.
+- 🛑 **Graceful shutdown** — menunggu tugas selesai saat aplikasi berhenti.
+
+### Contoh Penggunaan
+
+```go
+// Di main.go
+taskScheduler := scheduler.NewScheduler()
+
+// Jalankan setiap menit
+taskScheduler.EveryMinute("health-check", func() error {
+    log.Println("Server berjalan normal")
+    return nil
+})
+
+// Jalankan setiap hari pukul 02:00
+taskScheduler.DailyAt("cleanup-data", 2, 0, func() error {
+    log.Println("Membersihkan data lama...")
+    return nil
+})
+
+// Jalankan setiap jam
+taskScheduler.Hourly("sync-data", func() error {
+    log.Println("Sinkronisasi data...")
+    return nil
+})
+
+// Cron expression kustom (setiap hari Senin pukul 09:00)
+taskScheduler.Cron("weekly-report", "0 0 9 * * 1", func() error {
+    log.Println("Membuat laporan mingguan...")
+    return nil
+})
+
+taskScheduler.Start()
+defer taskScheduler.Stop()
+```
+
+### Daftar Helper Method
+
+| Method | Jadwal | Setara Laravel |
+|--------|--------|----------------|
+| `EverySecond()` | Setiap detik | `everySecond()` |
+| `EveryFiveSeconds()` | Setiap 5 detik | `everyFiveSeconds()` |
+| `EveryMinute()` | Setiap menit | `everyMinute()` |
+| `EveryFiveMinutes()` | Setiap 5 menit | `everyFiveMinutes()` |
+| `EveryFifteenMinutes()` | Setiap 15 menit | `everyFifteenMinutes()` |
+| `EveryThirtyMinutes()` | Setiap 30 menit | `everyThirtyMinutes()` |
+| `Hourly()` | Setiap jam | `hourly()` |
+| `Daily()` | Setiap hari (00:00) | `daily()` |
+| `DailyAt(hour, minute)` | Setiap hari pada jam tertentu | `dailyAt('13:00')` |
+| `Weekly()` | Setiap Minggu | `weekly()` |
+| `Monthly()` | Setiap tanggal 1 | `monthly()` |
+| `Cron(expression)` | Custom cron expression | `cron('* * * * *')` |
+
+→ [Baca dokumentasi lengkap Scheduler](internal/scheduler/README.md)
+
+---
+
 ## 📚 Penjelasan Setiap Layer
 
 ### 1. 🏗️ Domain (`internal/domain/`)
@@ -344,13 +417,16 @@ Implementasi **akses data** ke database menggunakan GORM. → [Baca selengkapnya
 ### 5. 🔐 Middleware (`internal/middleware/`)
 **Middleware** untuk autentikasi JWT, otorisasi role, dan CORS. → [Baca selengkapnya](internal/middleware/README.md)
 
-### 6. 📦 Package Utilitas (`pkg/`)
+### 6. ⏰ Scheduler (`internal/scheduler/`)
+**Task Scheduler** untuk penjadwalan tugas otomatis (mirip Laravel Scheduler). → [Baca selengkapnya](internal/scheduler/README.md)
+
+### 7. 📦 Package Utilitas (`pkg/`)
 Helper packages: format respons dan custom error types. → [Baca selengkapnya](pkg/README.md)
 
-### 7. 🏭 Infrastructure (`infrastructure/`)
+### 8. 🏭 Infrastructure (`infrastructure/`)
 Konfigurasi **database** dan external services. → [Baca selengkapnya](infrastructure/README.md)
 
-### 8. ⚙️ Config (`config/`)
+### 9. ⚙️ Config (`config/`)
 Pembacaan **konfigurasi** dari environment variable. → [Baca selengkapnya](config/README.md)
 
 ---
@@ -367,6 +443,7 @@ Pembacaan **konfigurasi** dari environment variable. → [Baca selengkapnya](con
 | **Password Hashing** | `bcrypt` untuk hashing yang aman, tidak bisa di-reverse |
 | **Connection Pool** | GORM connection pool untuk performa database yang optimal |
 | **Middleware Chain** | GIN middleware dieksekusi berurutan sebelum handler |
+| **Task Scheduling** | Penjadwalan tugas otomatis mirip Laravel Scheduler |
 
 ---
 

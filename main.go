@@ -33,6 +33,9 @@ import (
 	// repository berisi implementasi repository untuk akses database.
 	"github.com/andreantama/go-gin-basic/internal/repository"
 
+	// scheduler berisi fitur penjadwalan tugas otomatis (mirip Laravel Scheduler).
+	"github.com/andreantama/go-gin-basic/internal/scheduler"
+
 	// usecase berisi implementasi business logic.
 	"github.com/andreantama/go-gin-basic/internal/usecase"
 
@@ -121,7 +124,39 @@ func main() {
 	//     protected.GET("/profile", profileHandler.GetProfile)
 	// }
 
-	// ─── LANGKAH 7: JALANKAN SERVER ─────────────────────────────────────────
+	// ─── LANGKAH 7: INISIALISASI SCHEDULER ─────────────────────────────────
+	// Buat instance scheduler untuk menjalankan tugas-tugas terjadwal.
+	// Scheduler ini mirip dengan Laravel Task Scheduler.
+	taskScheduler := scheduler.NewScheduler()
+
+	// Daftarkan tugas-tugas terjadwal.
+	// Contoh: Health check setiap menit untuk memastikan server berjalan normal.
+	err = taskScheduler.EveryMinute("health-check", func() error {
+		log.Println("💓 [Health Check] Server berjalan normal")
+		return nil
+	})
+	if err != nil {
+		log.Printf("⚠️ Gagal mendaftarkan task health-check: %v", err)
+	}
+
+	// Contoh: Membersihkan data sementara setiap hari pukul 02:00.
+	// Anda bisa menambahkan logika pembersihan database, file cache, dll.
+	err = taskScheduler.DailyAt("cleanup-temp-data", 2, 0, func() error {
+		log.Println("🧹 [Cleanup] Membersihkan data sementara...")
+		// Tambahkan logika pembersihan di sini.
+		// Contoh: db.Where("created_at < ?", time.Now().AddDate(0, 0, -30)).Delete(&SomeModel{})
+		return nil
+	})
+	if err != nil {
+		log.Printf("⚠️ Gagal mendaftarkan task cleanup-temp-data: %v", err)
+	}
+
+	// Jalankan scheduler di background (non-blocking).
+	taskScheduler.Start()
+	// Hentikan scheduler saat aplikasi shutdown.
+	defer taskScheduler.Stop()
+
+	// ─── LANGKAH 8: JALANKAN SERVER ─────────────────────────────────────────
 	// Cetak informasi server yang berjalan ke console.
 	fmt.Printf("🚀 Server %s berjalan di http://localhost:%s\n", cfg.AppName, cfg.AppPort)
 	fmt.Printf("📌 Environment: %s\n", cfg.AppEnv)
