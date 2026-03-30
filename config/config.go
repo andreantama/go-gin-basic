@@ -30,10 +30,14 @@ type Config struct {
 	// AppPort adalah port HTTP yang digunakan server, contoh: "8080".
 	AppPort string
 
+	// DBDriver adalah jenis database yang digunakan: "mysql" atau "postgres".
+	// Default: "mysql" untuk backward compatibility.
+	DBDriver string
+
 	// DBHost adalah alamat host database MySQL/PostgreSQL.
 	DBHost string
 
-	// DBPort adalah port database, contoh: "3306" untuk MySQL.
+	// DBPort adalah port database, contoh: "3306" untuk MySQL atau "5432" untuk PostgreSQL.
 	DBPort string
 
 	// DBUser adalah username untuk koneksi database.
@@ -74,6 +78,17 @@ func LoadConfig() (*Config, error) {
 		jwtExpire = 24
 	}
 
+	// Baca jenis database driver, default "mysql" untuk backward compatibility.
+	dbDriver := getEnv("DB_DRIVER", "mysql")
+
+	// Tentukan default port berdasarkan jenis database driver.
+	defaultDBPort := "3306"
+	defaultDBUser := "root"
+	if dbDriver == "postgres" {
+		defaultDBPort = "5432"
+		defaultDBUser = "postgres"
+	}
+
 	// Buat instance Config dengan nilai dari environment variable.
 	cfg := &Config{
 		// Baca nama aplikasi, default "go-gin-clean-arch".
@@ -86,9 +101,10 @@ func LoadConfig() (*Config, error) {
 		AppPort: getEnv("APP_PORT", "8080"),
 
 		// Baca konfigurasi database.
+		DBDriver:   dbDriver,
 		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "3306"),
-		DBUser:     getEnv("DB_USER", "root"),
+		DBPort:     getEnv("DB_PORT", defaultDBPort),
+		DBUser:     getEnv("DB_USER", defaultDBUser),
 		DBPassword: getEnv("DB_PASSWORD", ""),
 		DBName:     getEnv("DB_NAME", "go_gin_db"),
 
@@ -119,6 +135,21 @@ func (c *Config) DSN() string {
 		c.DBHost,     // Host database.
 		c.DBPort,     // Port database.
 		c.DBName,     // Nama database.
+	)
+}
+
+// PostgresDSN menghasilkan Data Source Name (DSN) untuk koneksi ke database PostgreSQL.
+// DSN adalah string koneksi yang digunakan oleh GORM untuk terhubung ke database PostgreSQL.
+// Format: "host=localhost user=postgres password=xxx dbname=go_gin_db port=5432 sslmode=disable TimeZone=Asia/Jakarta"
+func (c *Config) PostgresDSN() string {
+	// Bangun DSN dari field-field konfigurasi database untuk PostgreSQL.
+	return fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Jakarta",
+		c.DBHost,     // Host database.
+		c.DBUser,     // Username database.
+		c.DBPassword, // Password database.
+		c.DBName,     // Nama database.
+		c.DBPort,     // Port database.
 	)
 }
 
