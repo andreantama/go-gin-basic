@@ -14,6 +14,7 @@ Proyek ini adalah contoh implementasi **Clean Architecture** menggunakan **Go** 
 - [REST API Endpoints](#rest-api-endpoints)
 - [Contoh Request & Response](#contoh-request--response)
 - [Task Scheduler](#-task-scheduler)
+- [Database Migrations](#-database-migrations)
 - [Penjelasan Setiap Layer](#penjelasan-setiap-layer)
 
 ---
@@ -45,6 +46,16 @@ go-gin-basic/
 ├── main.go                          # Entry point — inisialisasi dan dependency injection
 ├── go.mod                           # Definisi modul dan dependensi
 ├── .env.example                     # Template konfigurasi environment
+│
+├── migrations/                      # File SQL migration (golang-migrate)
+│   ├── README.md
+│   ├── embed.go                     # Ekspor embed.FS berisi file SQL
+│   ├── mysql/                       # Migration khusus MySQL
+│   │   ├── 000001_create_users_table.up.sql
+│   │   └── 000001_create_users_table.down.sql
+│   └── postgres/                    # Migration khusus PostgreSQL
+│       ├── 000001_create_users_table.up.sql
+│       └── 000001_create_users_table.down.sql
 │
 ├── config/                          # Konfigurasi aplikasi
 │   ├── README.md
@@ -87,7 +98,10 @@ go-gin-basic/
 └── infrastructure/                  # ← Lapisan paling luar (Frameworks & Drivers)
     ├── README.md
     └── database/
-        └── mysql.go                 # Koneksi MySQL, connection pool, auto-migration
+        ├── database.go              # Factory function NewDatabaseConnection
+        ├── migrate.go               # Runner migration menggunakan golang-migrate
+        ├── mysql.go                 # Koneksi MySQL, connection pool, jalankan migration
+        └── postgres.go              # Koneksi PostgreSQL, connection pool, jalankan migration
 ```
 
 ---
@@ -136,7 +150,9 @@ go-gin-basic/
 | **Go** | 1.21+ | Bahasa pemrograman utama |
 | **GIN** | v1.9.1 | HTTP Web Framework |
 | **GORM** | v1.25.7 | ORM untuk akses database |
+| **golang-migrate** | v4.19.1 | Manajemen SQL migration yang terkontrol |
 | **MySQL** | 8.0+ | Database relasional |
+| **PostgreSQL** | 14+ | Database relasional alternatif |
 | **golang-jwt** | v5.2.1 | Pembuatan dan validasi JWT token |
 | **bcrypt** | - | Hashing password yang aman |
 | **godotenv** | v1.5.1 | Membaca file `.env` |
@@ -400,6 +416,65 @@ defer taskScheduler.Stop()
 
 ---
 
+## 🗄️ Database Migrations
+
+Proyek ini menggunakan **golang-migrate** untuk manajemen skema database yang terkontrol. Migration sebelumnya menggunakan GORM AutoMigrate telah digantikan untuk memberikan kontrol penuh atas perubahan skema database.
+
+### Mengapa golang-migrate?
+
+| Fitur | GORM AutoMigrate (lama) | golang-migrate (sekarang) |
+|-------|------------------------|--------------------------|
+| File SQL eksplisit | ❌ | ✅ |
+| Rollback (DOWN) | ❌ | ✅ |
+| Audit trail | ❌ | ✅ |
+| Review SQL sebelum deploy | ❌ | ✅ |
+| Idempotent (hanya sekali) | ⚠️ | ✅ |
+
+### Cara Kerja
+
+Migration dijalankan **otomatis saat aplikasi start**. File SQL di-embed ke dalam binary menggunakan Go `embed`, sehingga tidak perlu file terpisah saat deployment.
+
+```
+go run main.go
+     │
+     ▼
+RunMigrations()
+     │
+     ├── Cek tabel schema_migrations
+     ├── Jalankan migration yang belum dieksekusi
+     └── Catat versi yang sudah dijalankan
+```
+
+### Struktur Migration
+
+```
+migrations/
+├── mysql/
+│   ├── 000001_create_users_table.up.sql    # Membuat tabel
+│   └── 000001_create_users_table.down.sql  # Rollback
+└── postgres/
+    ├── 000001_create_users_table.up.sql
+    └── 000001_create_users_table.down.sql
+```
+
+### Menambahkan Migration Baru
+
+Buat pasangan file UP dan DOWN dengan nomor versi berikutnya:
+
+```bash
+# MySQL
+migrations/mysql/000002_add_phone_to_users.up.sql
+migrations/mysql/000002_add_phone_to_users.down.sql
+
+# PostgreSQL
+migrations/postgres/000002_add_phone_to_users.up.sql
+migrations/postgres/000002_add_phone_to_users.down.sql
+```
+
+→ [Baca dokumentasi lengkap Migration](migrations/README.md)
+
+---
+
 ## 📚 Penjelasan Setiap Layer
 
 ### 1. 🏗️ Domain (`internal/domain/`)
@@ -426,7 +501,10 @@ Helper packages: format respons dan custom error types. → [Baca selengkapnya](
 ### 8. 🏭 Infrastructure (`infrastructure/`)
 Konfigurasi **database** dan external services. → [Baca selengkapnya](infrastructure/README.md)
 
-### 9. ⚙️ Config (`config/`)
+### 9. 🗄️ Migrations (`migrations/`)
+File SQL migration menggunakan **golang-migrate** untuk manajemen skema database. → [Baca selengkapnya](migrations/README.md)
+
+### 10. ⚙️ Config (`config/`)
 Pembacaan **konfigurasi** dari environment variable. → [Baca selengkapnya](config/README.md)
 
 ---
@@ -443,6 +521,7 @@ Pembacaan **konfigurasi** dari environment variable. → [Baca selengkapnya](con
 | **Password Hashing** | `bcrypt` untuk hashing yang aman, tidak bisa di-reverse |
 | **Connection Pool** | GORM connection pool untuk performa database yang optimal |
 | **Middleware Chain** | GIN middleware dieksekusi berurutan sebelum handler |
+| **SQL Migration** | golang-migrate dengan file SQL bernomor versi dan dukungan rollback |
 | **Task Scheduling** | Penjadwalan tugas otomatis mirip Laravel Scheduler |
 
 ---
@@ -452,5 +531,7 @@ Pembacaan **konfigurasi** dari environment variable. → [Baca selengkapnya](con
 - [Clean Architecture — Robert C. Martin](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - [GIN Framework Documentation](https://gin-gonic.com/docs/)
 - [GORM Documentation](https://gorm.io/docs/)
+- [golang-migrate Documentation](https://github.com/golang-migrate/migrate)
 - [JWT Introduction](https://jwt.io/introduction)
 - [Go Standard Project Layout](https://github.com/golang-standards/project-layout)
+- [Go embed Package](https://pkg.go.dev/embed)
