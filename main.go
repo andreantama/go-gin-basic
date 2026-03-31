@@ -67,7 +67,8 @@ func main() {
 
 	// ─── LANGKAH 3: INISIALISASI DATABASE ───────────────────────────────────
 	// Buat koneksi ke database berdasarkan driver yang dikonfigurasi (MySQL atau PostgreSQL).
-	// Fungsi ini juga menjalankan auto-migration untuk membuat tabel yang diperlukan.
+	// Fungsi ini juga menjalankan SQL migration menggunakan golang-migrate untuk
+	// membuat atau memperbarui tabel yang diperlukan.
 	db, err := database.NewDatabaseConnection(cfg)
 	if err != nil {
 		// Hentikan aplikasi jika tidak bisa terhubung ke database.

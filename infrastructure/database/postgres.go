@@ -28,7 +28,7 @@ import (
 )
 
 // NewPostgresConnection membuat dan mengembalikan koneksi database PostgreSQL menggunakan GORM.
-// Fungsi ini juga mengkonfigurasi connection pool dan menjalankan auto-migration.
+// Fungsi ini juga mengkonfigurasi connection pool dan menjalankan SQL migration.
 //
 // Parameter:
 //   - cfg: konfigurasi aplikasi yang berisi DSN database.
@@ -89,8 +89,10 @@ func NewPostgresConnection(cfg *config.Config) (*gorm.DB, error) {
 	// SetConnMaxLifetime mengatur berapa lama koneksi boleh digunakan sebelum ditutup.
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	// Jalankan auto-migration untuk membuat atau memperbarui tabel di database.
-	if err := runMigrations(db); err != nil {
+	// Jalankan SQL migration menggunakan golang-migrate.
+	// Migration membaca file SQL dari folder migrations/postgres/ yang di-embed ke binary.
+	// Setiap migration hanya dijalankan sekali; status dilacak di tabel schema_migrations.
+	if err := RunMigrations(db, "postgres"); err != nil {
 		// Kembalikan error jika migration gagal.
 		return nil, fmt.Errorf("gagal menjalankan database migration: %w", err)
 	}

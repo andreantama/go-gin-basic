@@ -4,7 +4,7 @@
 // Package ini bertanggung jawab untuk:
 //   - Membuka koneksi ke database MySQL menggunakan GORM.
 //   - Mengkonfigurasi connection pool.
-//   - Menjalankan auto-migration (membuat/update tabel secara otomatis).
+//   - Menjalankan SQL migration menggunakan golang-migrate.
 //
 // Dengan memisahkan setup database ke package tersendiri, kita bisa
 // mengganti database atau ORM tanpa mengubah lapisan bisnis.
@@ -23,9 +23,6 @@ import (
 	// config berisi konfigurasi aplikasi termasuk DSN database.
 	"github.com/andreantama/go-gin-basic/config"
 
-	// domain berisi struct entitas yang akan di-migrate ke tabel database.
-	"github.com/andreantama/go-gin-basic/internal/domain"
-
 	// gorm adalah ORM yang digunakan untuk berinteraksi dengan database.
 	"gorm.io/gorm"
 
@@ -37,7 +34,7 @@ import (
 )
 
 // NewMySQLConnection membuat dan mengembalikan koneksi database MySQL menggunakan GORM.
-// Fungsi ini juga mengkonfigurasi connection pool dan menjalankan auto-migration.
+// Fungsi ini juga mengkonfigurasi connection pool dan menjalankan SQL migration.
 //
 // Parameter:
 //   - cfg: konfigurasi aplikasi yang berisi DSN database.
@@ -104,10 +101,10 @@ func NewMySQLConnection(cfg *config.Config) (*gorm.DB, error) {
 	// Nilai 1 jam adalah nilai yang umum digunakan.
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	// Jalankan auto-migration untuk membuat atau memperbarui tabel di database.
-	// AutoMigrate memeriksa struct entitas dan membuat tabel yang sesuai jika belum ada.
-	// Jika tabel sudah ada, GORM akan menambahkan kolom baru yang belum ada (tapi tidak menghapus yang lama).
-	if err := runMigrations(db); err != nil {
+	// Jalankan SQL migration menggunakan golang-migrate.
+	// Migration membaca file SQL dari folder migrations/mysql/ yang di-embed ke binary.
+	// Setiap migration hanya dijalankan sekali; status dilacak di tabel schema_migrations.
+	if err := RunMigrations(db, "mysql"); err != nil {
 		// Kembalikan error jika migration gagal.
 		return nil, fmt.Errorf("gagal menjalankan database migration: %w", err)
 	}
@@ -117,28 +114,4 @@ func NewMySQLConnection(cfg *config.Config) (*gorm.DB, error) {
 
 	// Kembalikan instance koneksi database yang sudah dikonfigurasi.
 	return db, nil
-}
-
-// runMigrations menjalankan auto-migration untuk semua entitas domain.
-// Fungsi ini mendaftarkan semua struct entitas yang perlu dibuat sebagai tabel.
-// Fungsi ini bersifat private — hanya digunakan di dalam package ini.
-func runMigrations(db *gorm.DB) error {
-	// AutoMigrate menerima satu atau lebih struct dan membuat tabel yang sesuai.
-	// Tambahkan entitas baru di sini setiap kali ada model baru.
-	if err := db.AutoMigrate(
-		// Daftarkan entitas User untuk di-migrate ke tabel "users".
-		&domain.User{},
-		// Tambahkan entitas baru di sini, contoh:
-		// &domain.Product{},
-		// &domain.Order{},
-	); err != nil {
-		// Kembalikan error yang deskriptif jika migration gagal.
-		return fmt.Errorf("auto-migration gagal: %w", err)
-	}
-
-	// Log pesan sukses setelah migration berhasil.
-	log.Println("Database migration berhasil dijalankan")
-
-	// Kembalikan nil (tidak ada error).
-	return nil
 }
