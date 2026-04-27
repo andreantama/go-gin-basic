@@ -122,7 +122,7 @@ func main() {
 		}
 
 		// Buat instance migrate.
-		m, err = migrate.NewWithInstance("iofs", sourceDriver, cfg.DBName, dbDriver)
+		m, err = migrate.NewWithInstance("iofs", sourceDriver, "postgres", dbDriver)
 		if err != nil {
 			log.Fatalf("❌ Gagal menginisialisasi migrasi PostgreSQL: %v", err)
 		}
