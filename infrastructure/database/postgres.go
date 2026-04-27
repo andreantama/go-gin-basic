@@ -2,6 +2,11 @@
 //
 // File ini berisi implementasi koneksi untuk database PostgreSQL menggunakan GORM.
 // PostgreSQL adalah database relasional open-source yang populer dan powerful.
+//
+// Catatan: SQL migration tidak dijalankan otomatis saat koneksi dibuat.
+// Jalankan migration secara terpisah menggunakan perintah:
+//
+//	go run cmd/migrate/main.go
 package database
 
 import (
@@ -88,14 +93,6 @@ func NewPostgresConnection(cfg *config.Config) (*gorm.DB, error) {
 
 	// SetConnMaxLifetime mengatur berapa lama koneksi boleh digunakan sebelum ditutup.
 	sqlDB.SetConnMaxLifetime(time.Hour)
-
-	// Jalankan SQL migration menggunakan golang-migrate.
-	// Migration membaca file SQL dari folder migrations/postgres/ yang di-embed ke binary.
-	// Setiap migration hanya dijalankan sekali; status dilacak di tabel schema_migrations.
-	if err := RunMigrations(db, "postgres"); err != nil {
-		// Kembalikan error jika migration gagal.
-		return nil, fmt.Errorf("gagal menjalankan database migration: %w", err)
-	}
 
 	// Log pesan sukses ke console.
 	log.Println("Berhasil terhubung ke database PostgreSQL")

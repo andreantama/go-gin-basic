@@ -47,6 +47,10 @@ go-gin-basic/
 ├── go.mod                           # Definisi modul dan dependensi
 ├── .env.example                     # Template konfigurasi environment
 │
+├── cmd/                             # Perintah CLI yang bisa dijalankan secara terpisah
+│   └── migrate/
+│       └── main.go                  # Perintah untuk menjalankan database migration
+│
 ├── migrations/                      # File SQL migration (golang-migrate)
 │   ├── README.md
 │   ├── embed.go                     # Ekspor embed.FS berisi file SQL
@@ -100,8 +104,8 @@ go-gin-basic/
     └── database/
         ├── database.go              # Factory function NewDatabaseConnection
         ├── migrate.go               # Runner migration menggunakan golang-migrate
-        ├── mysql.go                 # Koneksi MySQL, connection pool, jalankan migration
-        └── postgres.go              # Koneksi PostgreSQL, connection pool, jalankan migration
+        ├── mysql.go                 # Koneksi MySQL dan connection pool
+        └── postgres.go              # Koneksi PostgreSQL dan connection pool
 ```
 
 ---
@@ -213,7 +217,40 @@ JWT_EXPIRE_HOURS=24
 CREATE DATABASE go_gin_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### 5. Jalankan Aplikasi
+### 5. Jalankan Migration Database
+
+Migration **tidak** berjalan otomatis saat `go run main.go`. Anda perlu menjalankannya secara terpisah menggunakan perintah `cmd/migrate`.
+
+#### MySQL
+
+Pastikan `.env` sudah dikonfigurasi dengan `DB_DRIVER=mysql`, lalu:
+
+```bash
+go run cmd/migrate/main.go
+```
+
+#### PostgreSQL
+
+Pastikan `.env` sudah dikonfigurasi dengan `DB_DRIVER=postgres`, lalu:
+
+```bash
+go run cmd/migrate/main.go
+```
+
+#### Rollback Migration (DOWN)
+
+```bash
+go run cmd/migrate/main.go -direction=down
+```
+
+Output yang diharapkan (contoh MySQL):
+
+```
+🗄️  Menjalankan migration up untuk database go_gin_db (mysql)...
+✅ Migration up berhasil dijalankan untuk database go_gin_db (mysql).
+```
+
+### 6. Jalankan Aplikasi
 
 ```bash
 go run main.go
@@ -432,18 +469,57 @@ Proyek ini menggunakan **golang-migrate** untuk manajemen skema database yang te
 
 ### Cara Kerja
 
-Migration dijalankan **otomatis saat aplikasi start**. File SQL di-embed ke dalam binary menggunakan Go `embed`, sehingga tidak perlu file terpisah saat deployment.
+Migration **tidak** dijalankan otomatis saat aplikasi start. Migration dijalankan secara eksplisit menggunakan perintah `cmd/migrate`. File SQL di-embed ke dalam binary menggunakan Go `embed`, sehingga tidak perlu file terpisah saat deployment.
 
 ```
-go run main.go
+go run cmd/migrate/main.go
      │
      ▼
-RunMigrations()
+cmd/migrate/main.go
      │
+     ├── Baca DB_DRIVER dari .env (mysql atau postgres)
+     ├── Buat koneksi ke database sesuai DB_NAME
      ├── Cek tabel schema_migrations
      ├── Jalankan migration yang belum dieksekusi
      └── Catat versi yang sudah dijalankan
 ```
+
+### Menjalankan Migration MySQL
+
+1. Set `DB_DRIVER=mysql` di file `.env`
+2. Pastikan database sudah dibuat:
+   ```sql
+   CREATE DATABASE go_gin_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+3. Jalankan migration:
+   ```bash
+   go run cmd/migrate/main.go
+   ```
+
+### Menjalankan Migration PostgreSQL
+
+1. Set `DB_DRIVER=postgres` di file `.env`
+2. Pastikan database sudah dibuat:
+   ```sql
+   CREATE DATABASE go_gin_db;
+   ```
+3. Jalankan migration:
+   ```bash
+   go run cmd/migrate/main.go
+   ```
+
+### Rollback Migration
+
+```bash
+# Rollback satu langkah terakhir
+go run cmd/migrate/main.go -direction=down
+```
+
+### Flag yang Tersedia
+
+| Flag | Nilai | Default | Deskripsi |
+|------|-------|---------|-----------|
+| `-direction` | `up` / `down` | `up` | Arah migration: terapkan atau rollback |
 
 ### Struktur Migration
 

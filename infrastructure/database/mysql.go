@@ -4,7 +4,11 @@
 // Package ini bertanggung jawab untuk:
 //   - Membuka koneksi ke database MySQL menggunakan GORM.
 //   - Mengkonfigurasi connection pool.
-//   - Menjalankan SQL migration menggunakan golang-migrate.
+//
+// Catatan: SQL migration tidak dijalankan otomatis saat koneksi dibuat.
+// Jalankan migration secara terpisah menggunakan perintah:
+//
+//	go run cmd/migrate/main.go
 //
 // Dengan memisahkan setup database ke package tersendiri, kita bisa
 // mengganti database atau ORM tanpa mengubah lapisan bisnis.
@@ -100,14 +104,6 @@ func NewMySQLConnection(cfg *config.Config) (*gorm.DB, error) {
 	// Ini mencegah masalah dengan koneksi yang sudah tidak valid karena timeout dari sisi database.
 	// Nilai 1 jam adalah nilai yang umum digunakan.
 	sqlDB.SetConnMaxLifetime(time.Hour)
-
-	// Jalankan SQL migration menggunakan golang-migrate.
-	// Migration membaca file SQL dari folder migrations/mysql/ yang di-embed ke binary.
-	// Setiap migration hanya dijalankan sekali; status dilacak di tabel schema_migrations.
-	if err := RunMigrations(db, "mysql"); err != nil {
-		// Kembalikan error jika migration gagal.
-		return nil, fmt.Errorf("gagal menjalankan database migration: %w", err)
-	}
 
 	// Log pesan sukses ke console.
 	log.Println("Berhasil terhubung ke database MySQL")

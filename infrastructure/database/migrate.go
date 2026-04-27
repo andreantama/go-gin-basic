@@ -53,9 +53,11 @@ import (
 // Parameter:
 //   - db:     instance *gorm.DB yang sudah terkoneksi ke database.
 //   - driver: jenis database — "mysql" atau "postgres".
+//   - dbName: nama database yang digunakan (diperlukan untuk PostgreSQL agar migration
+//     berjalan di database yang benar sesuai konfigurasi DB_NAME di .env).
 //
 // Mengembalikan error jika migration gagal dijalankan.
-func RunMigrations(db *gorm.DB, driver string) error {
+func RunMigrations(db *gorm.DB, driver string, dbName string) error {
 	// Dapatkan koneksi *sql.DB yang mendasari GORM.
 	// Diperlukan karena golang-migrate bekerja langsung dengan database/sql.
 	sqlDB, err := db.DB()
@@ -91,7 +93,9 @@ func RunMigrations(db *gorm.DB, driver string) error {
 
 	case "postgres":
 		// Buat database driver golang-migrate untuk PostgreSQL menggunakan koneksi yang sudah ada.
-		dbDriver, err := migpostgres.WithInstance(sqlDB, &migpostgres.Config{})
+		// DatabaseName wajib diisi agar golang-migrate menggunakan database yang benar
+		// sesuai dengan DB_NAME yang dikonfigurasi di .env.
+		dbDriver, err := migpostgres.WithInstance(sqlDB, &migpostgres.Config{DatabaseName: dbName})
 		if err != nil {
 			return fmt.Errorf("gagal membuat driver migrasi PostgreSQL: %w", err)
 		}
